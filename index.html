@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FastFEC</title>
+    <style>
+      body {
+        max-width: 66ch;
+        padding: 1em 3em;
+        box-sizing: border-box;
+        font-family: monospace;
+      }
+
+      a {
+        color: blue;
+      }
+
+      table {
+        border-spacing: 0;
+      }
+
+      td {
+        padding-right: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>FastFEC Web Assembly test</h1>
+    <p>
+      A proof-of-concept demo of running
+      <a href="https://github.com/washingtonpost/FastFEC" target="_blank"
+        >FastFEC</a
+      >
+      in the browser with WebAssembly (wasm) entirely locally. No data ever
+      leaves your device.
+      <span style="background: yellow"
+        >This demo only works on Chrome/Edge.</span
+      >
+    </p>
+    <p>
+      To get started, upload a raw .fec filing below, and then you will be
+      prompted to select an output directory.
+    </p>
+    <p>
+      FastFEC will run afterwards, outputting processed .csv files in the
+      selected output directory.
+    </p>
+
+    <p id="step1">
+      <b>Step 1:</b>
+      <input
+        id="fileButton"
+        type="file"
+        oninput="handleFile(event)"
+        accept=".fec"
+      />
+    </p>
+    <p id="step2" style="display: none">
+      <b>Step 2:</b>
+      <button id="directoryButton">
+        Choose output directory (preferably empty)
+      </button>
+    </p>
+
+    <p id="fileProgress"></p>
+    <p id="progress"></p>
+    <script>
+      const handles = {};
+      const writables = {};
+
+      const progressArea = document.getElementById("fileProgress");
+      const progress = document.getElementById("progress");
+      const step1 = document.getElementById("step1");
+      const step2 = document.getElementById("step2");
+      const fileButton = document.getElementById("fileButton");
+      const directoryButton = document.getElementById("directoryButton");
+      let startTime = null;
+
+      function pad(n) {
+        if (parseFloat(n) < 10) return `0${n}`;
+        return n;
+      }
+
+      function humanFileSize(size) {
+        // From https://stackoverflow.com/a/20732091
+        const i = Math.floor(Math.log(size) / Math.log(1024));
+        return (
+          (size / Math.pow(1024, i)).toFixed(2) +
+          " " +
+          ["B", "kB", "MB", "GB", "TB"][i]
+        );
+      }
+
+      function populateFileProgress(progress) {
+        while (progressArea.firstChild)
+          progressArea.removeChild(progressArea.firstChild);
+        const entries = Object.entries(progress);
+        const para = document.createElement("p");
+        para.textContent = "Output files:";
+        const table = document.createElement("table");
+        for (let i = 0; i < entries.length; i++) {
+          const [file, size] = entries[i];
+          const tr = document.createElement("tr");
+          const fileTd = document.createElement("td");
+          const b = document.createElement("b");
+          b.textContent = file;
+          fileTd.appendChild(b);
+          const sizeTd = document.createElement("td");
+          sizeTd.textContent = humanFileSize(size);
+          tr.appendChild(fileTd);
+          tr.appendChild(sizeTd);
+          table.appendChild(tr);
+        }
+        progressArea.appendChild(para);
+        progressArea.appendChild(table);
+      }
+
+      function handleMessage(e) {
+        const { pos, len, fileProgress } = e.data;
+        populateFileProgress(fileProgress);
+        console.log(fileProgress);
+        const elapsedTime = (Date.now() - startTime) / 1000;
+        const minutes = Math.floor(elapsedTime / 60);
+        const seconds =
+          pos != -1
+            ? Math.floor(elapsedTime - minutes * 60)
+            : (elapsedTime - minutes * 60).toFixed(2);
+        const timeString = `${minutes}:${pad(seconds)}`;
+
+        if (pos == -1) {
+          progress.textContent = `All done in ${timeString}! View the output directory on your computer to see the resulting files.`;
+          return;
+        }
+        const prog = ((pos / len) * 100).toFixed(2);
+        const postMessage =
+          pos == len ? " — closing open files (may take a second)..." : "";
+        progress.textContent = `${prog}% ${timeString}${postMessage}`;
+      }
+
+      async function handleFile(e) {
+        const files = e.target.files;
+        if (files.length == 1) {
+          const file = files[0];
+          const worker = new Worker("worker.js");
+
+          worker.addEventListener("message", handleMessage);
+
+          // Get directory access
+          step2.style.display = "block";
+          step1.style.opacity = "0.5";
+          fileButton.disabled = true;
+
+          directoryButton.onclick = async () => {
+            const directory = await window.showDirectoryPicker({
+              startIn: "desktop",
+            });
+            await directory.requestPermission({ writable: true });
+
+            // Write a readme to get write permissions
+            const handle = await directory.getFileHandle("README.txt", {
+              create: "true",
+            });
+            const writable = await handle.createWritable();
+            await writable.write(
+              "Generated output CSV files from FastFEC. https://github.com/washingtonpost/FastFEC"
+            );
+            await writable.close();
+            step2.style.opacity = "0.5";
+            directoryButton.disabled = true;
+
+            startTime = Date.now();
+            worker.postMessage({ file, directory });
+          };
+        }
+      }
+    </script>
+  </body>
+</html>
