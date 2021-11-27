@@ -1,4 +1,4 @@
-# FastFEC Wasm test
+# FastFEC Web Assembly demo
 
 Demo here: https://fastfec.pages.dev/
 
