@@ -1,5 +1,7 @@
 # FastFEC Wasm test
 
+Demo here: https://fastfec.pages.dev/
+
 A proof-of-concept demo of running [FastFEC](https://github.com/washingtonpost/FastFEC) in the browser with WebAssembly (wasm) entirely locally. No data ever leaves your device. This demo only works on Chrome/Edge since it depends on [FileSystemWritableFileStream](https://developer.mozilla.org/en-US/docs/Web/API/FileSystemWritableFileStream), which grants access to the user's filesystem.
 
 The compiled wasm library comes from the [releases page](https://github.com/washingtonpost/FastFEC/releases/latest) of FastFEC.
