@@ -120,7 +120,6 @@
       function handleMessage(e) {
         const { pos, len, fileProgress } = e.data;
         populateFileProgress(fileProgress);
-        console.log(fileProgress);
         const elapsedTime = (Date.now() - startTime) / 1000;
         const minutes = Math.floor(elapsedTime / 60);
         const seconds =
